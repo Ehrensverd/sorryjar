@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.14/dist/full.min.css" rel="stylesheet" type="text/css" />
+<script src="https://cdn.tailwindcss.com"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorry Jar</title>
+    <style>
+        /* General layout */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f7f7f7;
+        }
+
+        /* Container for the buttons */
+        .button-container {
+            margin-bottom: 20px;
+        }
+
+        /* Button styling */
+        .sorry-button {
+            padding: 10px 20px;
+            font-size: 18px;
+            border: none;
+            color: white;
+            cursor: pointer;
+            margin: 0 20px;
+        }
+
+        .sorry-button.vika { background-color: yellow; color: black; }
+        .sorry-button.eskil { background-color: green; color: white; }
+
+        /* Glass jar styling */
+        .jar-container {
+            position: relative;
+            width: 400px;
+            height: 300px;
+            border: 5px solid rgba(0, 0, 0, 0.1);
+            border-radius: 100px / 20px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Canvas for Matter.js */
+        #physics-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+ 
+<div class="hero bg-base-200 min-h-screen">
+    <div class="hero-content text-center">
+      <div class="max-w-md">
+        <h1 class="text-5xl font-bold">Eskil and Vika's Sorry Jar</h1>
+       
+        <div class="divider"></div>
+        <div class="flex w-full justify-between">
+            <button class="btn btn-warning vika" onclick="addSorry('Vika')">Vika</button>
+          
+            <button class="btn btn-success eskil" onclick="addSorry('Eskil')">Eskil</button>
+        </div>
+            <div class="divider"></div>
+
+            <div class="card bg-base-100 w-full shadow-xl">
+                <div class="card-body">
+                    <div class="jar-container">
+                    <canvas id="physics-canvas" width="200" height="300"></canvas>
+                </div>
+                </div>
+              </div>
+ 
+        
+      </div>
+    </div>
+ 
+    
+ 
+</div>
+<!-- Matter.js Library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.17.1/matter.min.js"></script>
+
+<script>
+    // Set up Matter.js
+    const { Engine, Render, World, Bodies, Body, Events } = Matter;
+
+    const engine = Engine.create();
+    const canvas = document.getElementById('physics-canvas');
+
+    const render = Render.create({
+        canvas: canvas,
+        engine: engine,
+        options: {
+            width: 400,
+            height: 300,
+            background: 'lightblue',
+            wireframes: false
+        }
+    });
+
+    // Create the static boundaries for the jar
+    const walls = [
+        Bodies.rectangle(100, 300, 600, 30, { isStatic: true }), // Bottom wall
+        Bodies.rectangle(0, 150, 10, 300, { isStatic: true }),   // Left wall
+        Bodies.rectangle(390, 150, 10, 300, { isStatic: true })  // Right wall
+    ];
+
+    World.add(engine.world, walls);
+
+    Engine.run(engine);
+    Render.run(render);
+// Variables to control fall speed and bounciness
+const fallSpeed = 0.0003;   // Adjust this for drop speed; higher is faster
+const bounciness = 0.8;  // Adjust this for bounce effect; higher is bouncier
+
+function addSorry(user, initialLoad = false) {
+    const textColor = user === 'Vika' ? 'yellow' : 'green';
+    const sorryBody = Bodies.rectangle(200, 50, 50, 20, {
+        restitution: bounciness,
+        friction: 0.01,
+        render: { fillStyle: 'transparent' }
+    });
+
+    Body.setAngularVelocity(sorryBody, Math.random() * 0.2 - 0.1);
+    Body.setVelocity(sorryBody, { x: Math.random() * 0.4 - 0.2, y: fallSpeed });
+
+    sorryBody.render.text = "Sorry";
+    sorryBody.render.textColor = textColor;
+    World.add(engine.world, sorryBody);
+
+    if (!initialLoad) {
+        fetch(`/increment_sorry/${user}/`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => console.log(data));
+    }
+}
+
+Events.on(render, 'afterRender', function() {
+    const context = render.context;
+    for (let body of engine.world.bodies) {
+        if (body.render.text) {
+            context.save();
+            context.translate(body.position.x, body.position.y);
+            context.rotate(body.angle);
+            context.font = "bold 16px Arial";
+            context.fillStyle = body.render.textColor;
+            context.textAlign = "center";
+            context.textBaseline = "middle";
+            context.fillText(body.render.text, 0, 0);
+            context.restore();
+        }
+    }
+});
+
+
+    // Make objects "fall" into the jar
+    Events.on(engine, 'afterUpdate', function() {
+        // Remove objects that fall outside the canvas
+        for (let i = 0; i < engine.world.bodies.length; i++) {
+            const body = engine.world.bodies[i];
+            if (body.position.y > 320) {
+                World.remove(engine.world, body);
+            }
+        }
+    });
+
+
+    window.onload = function() {
+        // Spawn initial sorry counts
+        const initialVikaCount = {{ vika_count }};
+        const initialEskilCount = {{ eskil_count }};
+        
+        for (let i = 0; i < initialVikaCount; i++) addSorry('Vika', true);
+        for (let i = 0; i < initialEskilCount; i++) addSorry('Eskil', true);
+    };
+</script>
+
+</body>
+</html>
